@@ -1,0 +1,92 @@
+spring:
+  application:
+    name: eventflow
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/eventflow
+    username: eventflow_user
+    password: eventflow_pass
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: redis_pass
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: eventflow-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "com.eventflow.*"
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:your-256-bit-secret-key-for-development-only-your-256-bit-secret-key-for-development-only}
+    expiration-ms: 3600000
+    refresh-expiration-ms: 604800000
+  seat-lock:
+    ttl-minutes: 10
+  aws:
+    region: ap-south-1
+    s3:
+      bucket-name: eventflow-assets
+    access-key: ${AWS_ACCESS_KEY:local}
+    secret-key: ${AWS_SECRET_KEY:local}
+  razorpay:
+    key-id: ${RAZORPAY_KEY_ID:rzp_test_local}
+    key-secret: ${RAZORPAY_KEY_SECRET:local_secret}
+  frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
+
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+logging:
+  level:
+    com.eventflow: DEBUG
+    org.springframework.security: DEBUG
+
