@@ -18,15 +18,18 @@ public class BookingCleanupJob {
     @Scheduled(fixedRate = 120000)
     @Transactional
     public void expirePendingBookings() {
-        var expired = bookingRepository.findWithItemsByStatusAndExpiresAtBefore(BookingStatus.PENDING, LocalDateTime.now());
-        expired.forEach(booking -> {
+        var now = LocalDateTime.now();
+        var expired = bookingRepository.findPendingExpiryIds(BookingStatus.PENDING, now, org.springframework.data.domain.PageRequest.of(0, 100));
+        for (var id : expired) {
+            var booking = bookingRepository.lockById(id).orElse(null);
+            if (booking == null || booking.getStatus() != BookingStatus.PENDING || booking.getExpiresAt().isAfter(now)) continue;
             booking.setStatus(BookingStatus.EXPIRED);
+            if (booking.getLockToken() == null) continue;
             seatLockService.releaseAllLocksForBooking(
-                    booking.getId(),
+                    booking.getLockToken(),
                     booking.getItems().stream().map(item -> item.getEventSeat().getId()).toList(),
                     booking.getEvent().getId()
             );
-        });
+        }
     }
 }
-

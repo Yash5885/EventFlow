@@ -7,7 +7,7 @@ public record LockStatusResponse(
         UUID bookingId,
         LocalDateTime expiresAt,
         long remainingSeconds,
-        boolean isExpired
+        boolean isExpired,
+        boolean canExtend
 ) {
 }
-

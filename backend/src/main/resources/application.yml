@@ -48,13 +48,16 @@ spring:
         spring.json.trusted.packages: "com.eventflow.*"
 
   mail:
-    host: smtp.gmail.com
-    port: 587
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
     properties:
-      mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:true}
+      mail.smtp.starttls.enable: ${MAIL_SMTP_STARTTLS:true}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
 
   servlet:
     multipart:
@@ -62,6 +65,10 @@ spring:
       max-request-size: 10MB
 
 app:
+  kafka:
+    booking-topic: ${APP_KAFKA_BOOKING_TOPIC:booking.confirmed}
+  auth:
+    allow-role-registration: ${APP_AUTH_ALLOW_ROLE_REGISTRATION:false}
   jwt:
     secret: ${JWT_SECRET:your-256-bit-secret-key-for-development-only-your-256-bit-secret-key-for-development-only}
     expiration-ms: 3600000
@@ -77,6 +84,11 @@ app:
   razorpay:
     key-id: ${RAZORPAY_KEY_ID:rzp_test_local}
     key-secret: ${RAZORPAY_KEY_SECRET:local_secret}
+    webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+    demo: ${RAZORPAY_DEMO:false}
+  ticket-mail:
+    enabled: ${TICKET_MAIL_ENABLED:false}
+    from: ${TICKET_MAIL_FROM:no-reply@eventflow.local}
   frontend-url: ${APP_FRONTEND_URL:http://localhost:3000}
 
 server:
@@ -89,4 +101,3 @@ logging:
   level:
     com.eventflow: DEBUG
     org.springframework.security: DEBUG
-

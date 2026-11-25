@@ -2,6 +2,8 @@ package com.eventflow.modules.event.dto;
 
 import com.eventflow.common.enums.EventStatus;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
+import java.util.List;
 
 import java.time.LocalDateTime;
 
@@ -14,7 +16,7 @@ public record UpdateEventRequest(
         LocalDateTime doorsOpenTime,
         LocalDateTime endTime,
         EventStatus status,
-        Boolean publicEvent
+        Boolean publicEvent,
+        @Valid List<CreateEventRequest.EventSeatPriceRequest> seatPrices
 ) {
 }
-

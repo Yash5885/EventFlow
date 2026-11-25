@@ -36,9 +36,21 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService userDetailsService;
 
+    @org.springframework.beans.factory.annotation.Value("${app.auth.allow-role-registration:false}")
+    private boolean enableRoleRegistration;
+
+    private final org.springframework.core.env.Environment environment;
+
+    public boolean allowRoleRegistration() {
+        return enableRoleRegistration && environment.matchesProfiles("dev");
+    }
+
     @Override
     @Transactional
     public UserResponse register(RegisterRequest request) {
+        if (request.role() != null && request.role() != UserRole.CUSTOMER && !allowRoleRegistration()) {
+            throw new AppException(HttpStatus.FORBIDDEN, "ROLE_RESTRICTED", "Staff accounts must be provisioned by your administrator");
+        }
         String email = normalizeEmail(request.email());
         if (userRepository.existsByEmail(email)) {
             throw new AppException(HttpStatus.CONFLICT, "RESOURCE_CONFLICT", "Email is already registered");

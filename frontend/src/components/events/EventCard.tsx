@@ -1,37 +1,33 @@
-import { CalendarDays, MapPin } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowUpRight } from 'lucide-react';
+import { flushSync } from 'react-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { EventSummaryResponse } from '../../types';
 import { fallbackEventImage } from '../../utils/constants';
 import { formatDateTime } from '../../utils/formatters';
 import { EventBadge } from './EventBadge';
 
 export function EventCard({ event }: { event: EventSummaryResponse }) {
+  const navigate = useNavigate();
+  const to = `/events/${event.id}`;
+
   return (
-    <article className="overflow-hidden rounded-md border border-border bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-      <img className="h-44 w-full object-cover" src={event.bannerUrl || fallbackEventImage} alt="" />
-      <div className="space-y-4 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-semibold uppercase text-secondary">{event.category || 'Event'}</span>
-          <EventBadge status={event.status} />
+    <article className="event-item">
+      <Link to={to} className="event-link focus-ring" onClick={click => {
+        if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+          click.button !== 0 || click.metaKey || click.ctrlKey || click.shiftKey || click.altKey) return;
+        click.preventDefault();
+        document.startViewTransition(() => flushSync(() => navigate(to)));
+      }}>
+        <div className="event-image" style={{ viewTransitionName: `event-${event.id}` }}>
+          <img src={event.bannerUrl || fallbackEventImage} alt="" loading="lazy" onError={event => {
+            if (event.currentTarget.getAttribute('src') !== fallbackEventImage) event.currentTarget.src = fallbackEventImage;
+          }} />
+          <span className="event-arrow"><ArrowUpRight size={21} aria-hidden="true" /></span>
         </div>
-        <div>
-          <h2 className="line-clamp-2 text-lg font-semibold">{event.title}</h2>
-          <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2">
-              <CalendarDays className="h-4 w-4" aria-hidden="true" />
-              {formatDateTime(event.eventDate)}
-            </span>
-            <span className="flex items-center gap-2">
-              <MapPin className="h-4 w-4" aria-hidden="true" />
-              {event.venueName}, {event.city}
-            </span>
-          </div>
-        </div>
-        <Link className="focus-ring inline-flex w-full items-center justify-center rounded-sm bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" to={`/events/${event.id}`}>
-          View seats
-        </Link>
-      </div>
+        <div className="event-meta"><span className="eyebrow">{event.category || 'Event'}</span>{event.status !== 'PUBLISHED' && <EventBadge status={event.status} />}</div>
+        <h2>{event.title}</h2>
+        <p>{formatDateTime(event.eventDate)}<br />{event.venueName}, {event.city}</p>
+      </Link>
     </article>
   );
 }
-

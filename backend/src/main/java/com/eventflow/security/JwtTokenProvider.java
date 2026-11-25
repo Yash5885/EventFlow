@@ -1,6 +1,7 @@
 package com.eventflow.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
@@ -66,7 +67,12 @@ public class JwtTokenProvider {
     }
 
     public boolean isRefreshTokenValid(String refreshToken) {
-        UUID userId = getUserIdFromToken(refreshToken);
+        UUID userId;
+        try {
+            userId = getUserIdFromToken(refreshToken);
+        } catch (JwtException | IllegalArgumentException exception) {
+            return false;
+        }
         String storedHash = redisTemplate.opsForValue().get(refreshKey(userId));
         return storedHash != null && MessageDigest.isEqual(storedHash.getBytes(StandardCharsets.UTF_8), sha256(refreshToken).getBytes(StandardCharsets.UTF_8));
     }

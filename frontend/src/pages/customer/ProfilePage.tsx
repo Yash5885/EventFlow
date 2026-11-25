@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getMe } from '../../api/auth.api';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { Workspace } from '../../components/layout/Workspace';
 import { useAuthStore } from '../../store/auth.store';
 
 export function ProfilePage() {
@@ -9,28 +10,13 @@ export function ProfilePage() {
   const user = data ?? storedUser;
 
   return (
-    <main className="page-container py-8">
-      <section className="max-w-xl rounded-md border border-border bg-white p-6 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Profile</h1>
-          {isLoading && <LoadingSpinner label="Syncing" />}
-        </div>
-        <dl className="grid gap-3 text-sm">
-          <div className="flex justify-between gap-4 border-b border-border py-2">
-            <dt className="text-muted-foreground">Name</dt>
-            <dd className="font-medium">{user?.name}</dd>
-          </div>
-          <div className="flex justify-between gap-4 border-b border-border py-2">
-            <dt className="text-muted-foreground">Email</dt>
-            <dd className="font-medium">{user?.email}</dd>
-          </div>
-          <div className="flex justify-between gap-4 py-2">
-            <dt className="text-muted-foreground">Role</dt>
-            <dd className="font-medium">{user?.role.replace('_', ' ')}</dd>
-          </div>
-        </dl>
-      </section>
-    </main>
+    <Workspace role="CUSTOMER" title="Profile" description="Your EventFlow account details.">
+      {isLoading && <LoadingSpinner label="Syncing profile" />}
+      <dl className="profile-details">
+        <div><dt>Name</dt><dd>{user?.name}</dd></div>
+        <div><dt>Email</dt><dd>{user?.email}</dd></div>
+        <div><dt>Role</dt><dd>{user?.role.replace(/_/g, ' ')}</dd></div>
+      </dl>
+    </Workspace>
   );
 }
-

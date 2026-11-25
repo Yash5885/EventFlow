@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import App from './App';
 import './index.css';
+import './workflows.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,9 +21,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <App />
-        <Toaster richColors position="top-right" />
+        <Toaster richColors position="top-right" toastOptions={{ style: { borderRadius: 2, fontFamily: "var(--body)" } }} />
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>
 );
-

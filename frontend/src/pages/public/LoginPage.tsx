@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { LogIn } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { login } from '../../api/auth.api';
@@ -16,8 +16,11 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
+const customerDestination = /^\/(?:my-bookings|dashboard|profile|events\/[\w-]+\/seats|checkout\/[\w-]+|booking\/[\w-]+\/confirm)$/;
+
 export function LoginPage() {
   const navigate = useNavigate();
+  const { state } = useLocation();
   const setAuth = useAuthStore(state => state.setAuth);
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '' } });
   const mutation = useMutation({
@@ -25,30 +28,37 @@ export function LoginPage() {
     onSuccess: auth => {
       setAuth(auth);
       toast.success('Logged in');
+      const from = state?.from;
+      if (auth.user.role === 'CUSTOMER' && typeof from?.pathname === 'string' && customerDestination.test(from.pathname)) {
+        navigate({ pathname: from.pathname, search: from.search, hash: from.hash }, { replace: true });
+        return;
+      }
       navigate(auth.user.role === 'ADMIN' ? '/admin' : auth.user.role === 'ORGANIZER' ? '/organizer' : auth.user.role === 'VENUE_MANAGER' ? '/venue' : '/dashboard');
     },
     onError: error => toast.error(getApiErrorMessage(error, 'Login failed'))
   });
 
+  const { errors } = form.formState;
+
   return (
-    <main className="page-container grid min-h-[calc(100vh-130px)] place-items-center py-8">
-      <form onSubmit={form.handleSubmit(values => mutation.mutate(values))} className="w-full max-w-md rounded-md border border-border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Login</h1>
-        <label className="mt-5 block text-sm font-medium">
-          Email
-          <input className="focus-ring mt-2 h-11 w-full rounded-sm border border-input px-3" type="email" {...form.register('email')} />
+    <main className="auth-layout">
+      <div className="auth-art" aria-hidden="true"><p>Good to see you.</p></div>
+      <form onSubmit={form.handleSubmit(values => mutation.mutate(values))} className="auth-form">
+        <p className="eyebrow">EventFlow account</p>
+        <h1>Log in</h1>
+        <label>Email
+          <input type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} {...form.register('email')} />
+          {errors.email && <span className="field-error" role="alert">Enter a valid email address.</span>}
         </label>
-        <label className="mt-4 block text-sm font-medium">
-          Password
-          <input className="focus-ring mt-2 h-11 w-full rounded-sm border border-input px-3" type="password" {...form.register('password')} />
+        <label>Password
+          <input type="password" autoComplete="current-password" aria-invalid={Boolean(errors.password)} {...form.register('password')} />
+          {errors.password && <span className="field-error" role="alert">Enter at least eight characters.</span>}
         </label>
-        <button className="focus-ring mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-sm bg-primary px-4 text-sm font-semibold text-primary-foreground" type="submit" disabled={mutation.isPending}>
-          <LogIn className="h-4 w-4" aria-hidden="true" />
-          Login
+        <button className="button-dark focus-ring" type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Logging in…' : 'Log in'}
+          <LogIn size={18} aria-hidden="true" />
         </button>
-        <p className="mt-4 text-sm text-muted-foreground">
-          New here? <Link className="font-semibold text-primary" to="/register">Create an account</Link>
-        </p>
+        <p>New here? <Link to="/register" state={state}>Create an account</Link></p>
       </form>
     </main>
   );

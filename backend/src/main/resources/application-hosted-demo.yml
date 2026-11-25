@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${EVENTFLOW_DB_HOST}:5432/${EVENTFLOW_DB_NAME}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+  flyway:
+    locations: classpath:db/migration,classpath:db/hosted-demo
+  mail:
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+
+app:
+  kafka:
+    enabled: false
+  razorpay:
+    demo: true
+  frontend-url: ${APP_FRONTEND_URL:${RENDER_EXTERNAL_URL:http://localhost:8080}}
+
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-binding-errors: never
+
+logging:
+  level:
+    com.eventflow: INFO
+    org.springframework.security: INFO

@@ -10,7 +10,7 @@ public record TicketVerifyResponse(
         boolean isValid,
         boolean isUsed,
         LocalDateTime usedAt,
-        String message
+        String message,
+        String result
 ) {
 }
-

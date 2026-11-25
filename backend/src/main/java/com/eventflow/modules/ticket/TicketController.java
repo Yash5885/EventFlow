@@ -16,7 +16,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.view.RedirectView;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 import java.util.UUID;
@@ -27,6 +31,7 @@ import java.util.UUID;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final TicketTransferService transfers;
 
     @GetMapping("/booking/{bookingId}")
     public ApiResponse<List<TicketResponse>> byBooking(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID bookingId) {
@@ -34,13 +39,36 @@ public class TicketController {
     }
 
     @GetMapping("/{id}/download")
-    public RedirectView download(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
-        return new RedirectView(ticketService.downloadUrl(principal, id));
+    public ResponseEntity<byte[]> download(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("eventflow-" + id + ".pdf").build().toString())
+                .body(ticketService.download(principal, id));
+    }
+
+    @GetMapping("/gate/events")
+    public ApiResponse<List<com.eventflow.modules.event.dto.EventSummaryResponse>> gateEvents(@AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.ok(ticketService.gateEvents(principal));
+    }
+
+    @GetMapping("/gate/events/{id}")
+    public ApiResponse<TicketService.Attendance> attendance(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
+        return ApiResponse.ok(ticketService.attendance(principal, id));
     }
 
     @PostMapping("/verify")
-    public ApiResponse<TicketVerifyResponse> verify(@Valid @RequestBody TicketVerifyRequest request) {
-        return ApiResponse.ok(ticketService.verify(request.ticketCode()));
+    public ApiResponse<TicketVerifyResponse> verify(@AuthenticationPrincipal UserPrincipal principal, @Valid @RequestBody TicketVerifyRequest request) {
+        return ApiResponse.ok(ticketService.verify(principal, request.eventId(), request.ticketCode()));
+    }
+
+    @PostMapping("/{id}/transfer")
+    public ApiResponse<TicketTransferService.Offer> offer(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
+        return ApiResponse.ok(transfers.offer(principal, id));
+    }
+
+    @PostMapping("/claim")
+    public ApiResponse<TicketResponse> claim(@AuthenticationPrincipal UserPrincipal principal,
+                                             @Valid @RequestBody TicketTransferService.Claim request) {
+        return ApiResponse.ok(transfers.claim(principal, request.token()));
     }
 
     @GetMapping("/my")
@@ -48,4 +76,3 @@ public class TicketController {
         return ApiResponse.ok(ticketService.myTickets(principal, pageable));
     }
 }
-

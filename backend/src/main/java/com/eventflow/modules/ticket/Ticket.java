@@ -45,6 +45,20 @@ public class Ticket {
     @JoinColumn(name = "event_seat_id", nullable = false)
     private EventSeat eventSeat;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "holder_id")
+    private com.eventflow.modules.user.User holder;
+
+    @Column(name = "transfer_hash")
+    private String transferHash;
+
+    @Column(name = "transfer_expires_at")
+    private LocalDateTime transferExpiresAt;
+
+    public com.eventflow.modules.user.User currentHolder() {
+        return holder != null ? holder : booking.getUser();
+    }
+
     @Column(name = "ticket_code", nullable = false, unique = true, length = 50)
     private String ticketCode;
 
@@ -65,4 +79,3 @@ public class Ticket {
     @Column(name = "created_at", updatable = false, nullable = false)
     private LocalDateTime createdAt;
 }
-

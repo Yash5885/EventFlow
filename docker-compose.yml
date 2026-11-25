@@ -58,8 +58,19 @@ services:
       SPRING_DATA_REDIS_PASSWORD: redis_pass
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       JWT_SECRET: change-this-development-secret-change-this-development-secret
-      MAIL_USERNAME: local@example.com
-      MAIL_PASSWORD: local
+      MAIL_USERNAME: ${MAIL_USERNAME:-local@example.com}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-local}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_SMTP_AUTH: ${MAIL_SMTP_AUTH:-true}
+      MAIL_SMTP_STARTTLS: ${MAIL_SMTP_STARTTLS:-true}
+      TICKET_MAIL_ENABLED: ${TICKET_MAIL_ENABLED:-false}
+      TICKET_MAIL_FROM: ${TICKET_MAIL_FROM:-no-reply@eventflow.local}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_local}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-local_secret}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      RAZORPAY_DEMO: ${RAZORPAY_DEMO:-false}
+      APP_AUTH_ALLOW_ROLE_REGISTRATION: ${APP_AUTH_ALLOW_ROLE_REGISTRATION:-false}
       AWS_ACCESS_KEY: local
       AWS_SECRET_KEY: local
 
@@ -73,4 +84,3 @@ services:
 
 volumes:
   postgres_data:
-

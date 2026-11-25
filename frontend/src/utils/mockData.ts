@@ -1,12 +1,19 @@
 import type { EventDetailResponse, EventSummaryResponse, SeatMapResponse } from '../types';
 
+function sampleDate(daysAhead: number, hour: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysAhead);
+  date.setHours(hour, 30, 0, 0);
+  return date.toISOString();
+}
+
 export const sampleEvents: EventSummaryResponse[] = [
   {
     id: '11111111-1111-1111-1111-111111111111',
     title: 'Mumbai Indie Music Night',
     category: 'Concert',
-    bannerUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=1200&q=80',
-    eventDate: new Date(Date.now() + 86400000 * 12).toISOString(),
+    bannerUrl: '/editorial/indie.webp',
+    eventDate: sampleDate(12, 19),
     status: 'PUBLISHED',
     venueId: '21111111-1111-1111-1111-111111111111',
     venueName: 'Riverfront Arena',
@@ -16,8 +23,8 @@ export const sampleEvents: EventSummaryResponse[] = [
     id: '22222222-2222-2222-2222-222222222222',
     title: 'Bengaluru Founders Summit',
     category: 'Conference',
-    bannerUrl: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?auto=format&fit=crop&w=1200&q=80',
-    eventDate: new Date(Date.now() + 86400000 * 21).toISOString(),
+    bannerUrl: '/editorial/founders.webp',
+    eventDate: sampleDate(21, 10),
     status: 'PUBLISHED',
     venueId: '22222222-1111-1111-1111-111111111111',
     venueName: 'Civic Convention Hall',
@@ -27,8 +34,8 @@ export const sampleEvents: EventSummaryResponse[] = [
     id: '33333333-3333-3333-3333-333333333333',
     title: 'Delhi Championship Finals',
     category: 'Sports',
-    bannerUrl: 'https://images.unsplash.com/photo-1547347298-4074fc3086f0?auto=format&fit=crop&w=1200&q=80',
-    eventDate: new Date(Date.now() + 86400000 * 32).toISOString(),
+    bannerUrl: '/editorial/finals.webp',
+    eventDate: sampleDate(32, 17),
     status: 'PUBLISHED',
     venueId: '23333333-1111-1111-1111-111111111111',
     venueName: 'National Indoor Stadium',
@@ -45,7 +52,7 @@ export function sampleEventDetail(id = sampleEvents[0].id): EventDetailResponse 
       venueId: event.venueId,
       title: event.title,
       description:
-        'Reserved seating, live availability, and checkout protected by short-lived Redis locks. Tickets are generated after payment confirmation.',
+        'Browse the example seating plan to see how reserved seating works.',
       category: event.category,
       bannerUrl: event.bannerUrl,
       eventDate: event.eventDate,
@@ -85,4 +92,3 @@ export function sampleSeatMap(eventId = sampleEvents[0].id): SeatMapResponse {
     rows
   } as SeatMapResponse;
 }
-

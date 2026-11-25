@@ -1,2 +1,1 @@
-signal hire -chrome extension
-leethub - chrome extension
+/// <reference types="vite/client" />

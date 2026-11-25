@@ -1,0 +1,52 @@
+services:
+  - type: web
+    name: eventflow-live
+    runtime: docker
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile.render
+    dockerContext: .
+    healthCheckPath: /api/v1/payments/config
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: hosted-demo
+      - key: JWT_SECRET
+        generateValue: true
+      - key: EVENTFLOW_DB_HOST
+        fromDatabase:
+          name: eventflow-demo-db
+          property: host
+      - key: EVENTFLOW_DB_NAME
+        fromDatabase:
+          name: eventflow-demo-db
+          property: database
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: eventflow-demo-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: eventflow-demo-db
+          property: password
+      - key: SPRING_DATA_REDIS_URL
+        fromService:
+          type: keyvalue
+          name: eventflow-demo-cache
+          property: connectionString
+      - key: JAVA_TOOL_OPTIONS
+        value: -Xmx240m -Xss512k -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m -XX:+UseSerialGC -XX:ActiveProcessorCount=2
+
+  - type: keyvalue
+    name: eventflow-demo-cache
+    region: oregon
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
+databases:
+  - name: eventflow-demo-db
+    databaseName: eventflow
+    region: oregon
+    plan: free
+    postgresMajorVersion: "16"
+    ipAllowList: []

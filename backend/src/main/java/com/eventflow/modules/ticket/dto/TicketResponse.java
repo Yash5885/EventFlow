@@ -11,7 +11,9 @@ public record TicketResponse(
         String ticketCode,
         String qrCodeUrl,
         String pdfUrl,
-        boolean isUsed
+        boolean isUsed,
+        String eventTitle,
+        String seatLabel
 ) {
     public static TicketResponse from(Ticket ticket) {
         return new TicketResponse(
@@ -20,9 +22,10 @@ public record TicketResponse(
                 ticket.getEventSeat().getId(),
                 ticket.getTicketCode(),
                 ticket.getQrCodeUrl(),
-                ticket.getPdfUrl(),
-                Boolean.TRUE.equals(ticket.getUsed())
+                "/api/v1/tickets/" + ticket.getId() + "/download",
+                Boolean.TRUE.equals(ticket.getUsed()),
+                ticket.getBooking().getEvent().getTitle(),
+                ticket.getEventSeat().getSeat().getRowLabel() + ticket.getEventSeat().getSeat().getSeatNumber()
         );
     }
 }
-

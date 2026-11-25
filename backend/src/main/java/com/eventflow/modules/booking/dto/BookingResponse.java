@@ -16,6 +16,10 @@ public record BookingResponse(
         BigDecimal platformFee,
         LocalDateTime expiresAt,
         List<BookingSeatResponse> seats,
+        String eventTitle,
+        String venueName,
+        LocalDateTime eventDate,
+        BigDecimal amountDue,
         LocalDateTime createdAt
 ) {
     public static BookingResponse from(Booking booking) {
@@ -27,8 +31,11 @@ public record BookingResponse(
                 booking.getPlatformFee(),
                 booking.getExpiresAt(),
                 booking.getItems().stream().map(BookingSeatResponse::from).toList(),
+                booking.getEvent().getTitle(),
+                booking.getEvent().getVenue().getName(),
+                booking.getEvent().getEventDate(),
+                booking.amountDue(),
                 booking.getCreatedAt()
         );
     }
 }
-

@@ -15,6 +15,8 @@ public interface BookingService {
 
     BookingResponse confirm(UserPrincipal principal, UUID bookingId, ConfirmBookingRequest request);
 
+    BookingResponse settleCapture(UUID bookingId, String orderId, String paymentId);
+
     void release(UserPrincipal principal, UUID bookingId);
 
     PageResponse<BookingResponse> myBookings(UserPrincipal principal, Pageable pageable);
@@ -25,4 +27,3 @@ public interface BookingService {
 
     LockStatusResponse extendLock(UserPrincipal principal, UUID bookingId);
 }
-

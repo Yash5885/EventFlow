@@ -1,11 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { UserPlus } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { register } from '../../api/auth.api';
+import { getRegistrationOptions, register } from '../../api/auth.api';
 import type { UserRole } from '../../types';
 import { getApiErrorMessage } from '../../utils/apiErrors';
 
@@ -20,47 +20,50 @@ type FormValues = z.infer<typeof schema>;
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const { data: options } = useQuery({ queryKey: ['registration-options'], queryFn: getRegistrationOptions });
   const form = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: { name: '', email: '', password: '', role: 'CUSTOMER' } });
   const mutation = useMutation({
     mutationFn: register,
     onSuccess: () => {
       toast.success('Account created');
-      navigate('/login');
+      navigate('/login', { state });
     },
     onError: error => toast.error(getApiErrorMessage(error, 'Registration failed'))
   });
 
+  const { errors } = form.formState;
+
   return (
-    <main className="page-container grid min-h-[calc(100vh-130px)] place-items-center py-8">
-      <form onSubmit={form.handleSubmit(values => mutation.mutate(values))} className="w-full max-w-md rounded-md border border-border bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Register</h1>
-        <label className="mt-5 block text-sm font-medium">
-          Name
-          <input className="focus-ring mt-2 h-11 w-full rounded-sm border border-input px-3" {...form.register('name')} />
+    <main className="auth-layout">
+      <div className="auth-art" aria-hidden="true"><p>The night is yours.</p></div>
+      <form onSubmit={form.handleSubmit(values => mutation.mutate(values))} className="auth-form">
+        <p className="eyebrow">EventFlow account</p>
+        <h1>Create an account</h1>
+        <label>Name
+          <input autoComplete="name" aria-invalid={Boolean(errors.name)} {...form.register('name')} />
+          {errors.name && <span className="field-error" role="alert">Enter at least two characters.</span>}
         </label>
-        <label className="mt-4 block text-sm font-medium">
-          Email
-          <input className="focus-ring mt-2 h-11 w-full rounded-sm border border-input px-3" type="email" {...form.register('email')} />
+        <label>Email
+          <input type="email" autoComplete="email" aria-invalid={Boolean(errors.email)} {...form.register('email')} />
+          {errors.email && <span className="field-error" role="alert">Enter a valid email address.</span>}
         </label>
-        <label className="mt-4 block text-sm font-medium">
-          Password
-          <input className="focus-ring mt-2 h-11 w-full rounded-sm border border-input px-3" type="password" {...form.register('password')} />
+        <label>Password
+          <input type="password" autoComplete="new-password" aria-invalid={Boolean(errors.password)} {...form.register('password')} />
+          {errors.password && <span className="field-error" role="alert">Enter at least eight characters.</span>}
         </label>
-        <label className="mt-4 block text-sm font-medium">
-          Role
-          <select className="focus-ring mt-2 h-11 w-full rounded-sm border border-input px-3" {...form.register('role')}>
+        {options?.staffRoles && <label>Role
+          <select {...form.register('role')}>
             {(['CUSTOMER', 'ORGANIZER', 'VENUE_MANAGER', 'ADMIN'] as UserRole[]).map(role => (
               <option key={role} value={role}>{role.replace('_', ' ')}</option>
             ))}
           </select>
-        </label>
-        <button className="focus-ring mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-sm bg-primary px-4 text-sm font-semibold text-primary-foreground" type="submit" disabled={mutation.isPending}>
-          <UserPlus className="h-4 w-4" aria-hidden="true" />
-          Register
+        </label>}
+        <button className="button-dark focus-ring" type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? 'Creating account…' : 'Register'}
+          <UserPlus size={18} aria-hidden="true" />
         </button>
-        <p className="mt-4 text-sm text-muted-foreground">
-          Have an account? <Link className="font-semibold text-primary" to="/login">Login</Link>
-        </p>
+        <p>Have an account? <Link to="/login" state={state}>Log in</Link></p>
       </form>
     </main>
   );

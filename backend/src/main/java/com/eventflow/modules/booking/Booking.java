@@ -76,6 +76,23 @@ public class Booking {
     @Column(name = "expires_at", nullable = false)
     private LocalDateTime expiresAt;
 
+    @Column(name = "lock_extended_at")
+    private LocalDateTime lockExtendedAt;
+
+    public BigDecimal amountDue() {
+        return totalAmount.add(platformFee).subtract(discountAmount);
+    }
+
+    @Column(name = "lock_token")
+    private UUID lockToken;
+
+    public UUID activeLockToken() {
+        return lockToken != null ? lockToken : user.getId();
+    }
+
+    @Column(name = "ticket_email_sent_at")
+    private LocalDateTime ticketEmailSentAt;
+
     @Column(name = "booked_at")
     private LocalDateTime bookedAt;
 
@@ -103,4 +120,3 @@ public class Booking {
         item.setBooking(this);
     }
 }
-

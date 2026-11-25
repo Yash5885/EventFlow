@@ -2,7 +2,8 @@ export function formatCurrency(value: number, currency = 'INR') {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency,
-    maximumFractionDigits: 0
+    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    maximumFractionDigits: 2
   }).format(value);
 }
 
@@ -18,4 +19,3 @@ export function formatTimer(totalSeconds: number) {
   const seconds = Math.max(0, totalSeconds % 60).toString().padStart(2, '0');
   return `${minutes}:${seconds}`;
 }
-

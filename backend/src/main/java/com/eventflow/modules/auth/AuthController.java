@@ -26,10 +26,15 @@ import org.springframework.web.servlet.view.RedirectView;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthService authService;
+    private final AuthServiceImpl authService;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
+
+    @GetMapping("/registration-options")
+    public ApiResponse<java.util.Map<String, Boolean>> registrationOptions() {
+        return ApiResponse.ok(java.util.Map.of("staffRoles", authService.allowRoleRegistration()));
+    }
 
     @PostMapping("/register")
     public ApiResponse<UserResponse> register(@Valid @RequestBody RegisterRequest request) {

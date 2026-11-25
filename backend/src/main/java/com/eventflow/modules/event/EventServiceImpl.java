@@ -5,6 +5,7 @@ import com.eventflow.common.enums.EventStatus;
 import com.eventflow.common.enums.SeatStatus;
 import com.eventflow.common.enums.UserRole;
 import com.eventflow.common.exception.AppException;
+import com.eventflow.common.exception.ValidationAppException;
 import com.eventflow.common.exception.ResourceNotFoundException;
 import com.eventflow.modules.booking.SeatLockService;
 import com.eventflow.modules.event.dto.CreateEventRequest;
@@ -85,27 +86,30 @@ public class EventServiceImpl implements EventService {
 
     @Override
     @Transactional(readOnly = true)
-    public PageResponse<EventSummaryResponse> listPublished(String city, String category, Pageable pageable) {
-        var page = eventRepository.findByStatusAndPublicEventTrue(EventStatus.PUBLISHED, pageable)
-                .map(EventSummaryResponse::from);
-        var filtered = page.getContent().stream()
-                .filter(event -> !StringUtils.hasText(city) || event.city().equalsIgnoreCase(city))
-                .filter(event -> !StringUtils.hasText(category) || category.equalsIgnoreCase(event.category()))
-                .toList();
-        return new PageResponse<>(filtered, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages(), page.isLast());
+    public PageResponse<EventSummaryResponse> listPublished(String city, String category, String q, Pageable pageable) {
+        var page = eventRepository.searchPublished(EventStatus.PUBLISHED, searchTerm(city), searchTerm(category), searchTerm(q), pageable);
+        return PageResponse.from(page.map(EventSummaryResponse::from));
+    }
+
+    private String searchTerm(String value) {
+        return value == null ? "" : value.strip().toLowerCase(java.util.Locale.ROOT);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public EventDetailResponse detail(UUID id) {
-        return EventDetailResponse.from(findEvent(id));
+    public EventDetailResponse detail(UserPrincipal principal, UUID id) {
+        return EventDetailResponse.from(visibleEvent(principal, id));
     }
 
     @Override
     @Transactional
     public EventResponse update(UserPrincipal principal, UUID id, UpdateEventRequest request) {
-        Event event = findEvent(id);
+        Event event = lockEvent(id);
         assertOwnerOrAdmin(principal, event);
+        requireDraft(event);
+        if (request.status() != null || request.publicEvent() != null) {
+            throw new ValidationAppException("REVIEW_REQUIRED", "Use the review workflow to publish an event");
+        }
         if (StringUtils.hasText(request.title())) event.setTitle(request.title());
         if (request.description() != null) event.setDescription(request.description());
         if (request.category() != null) event.setCategory(request.category());
@@ -113,24 +117,43 @@ public class EventServiceImpl implements EventService {
         if (request.eventDate() != null) event.setEventDate(request.eventDate());
         if (request.doorsOpenTime() != null) event.setDoorsOpenTime(request.doorsOpenTime());
         if (request.endTime() != null) event.setEndTime(request.endTime());
-        if (request.status() != null) event.setStatus(request.status());
-        if (request.publicEvent() != null) event.setPublicEvent(request.publicEvent());
+        if (request.seatPrices() != null) {
+            var prices = new java.util.HashMap<UUID, BigDecimal>();
+            for (var seat : request.seatPrices()) {
+                if (prices.putIfAbsent(seat.seatId(), seat.price()) != null) {
+                    throw new ValidationAppException("DUPLICATE_SEAT", "A seat was listed twice");
+                }
+            }
+            var inventory = eventSeatRepository.findByEvent_Id(id);
+            var ids = inventory.stream().map(seat -> seat.getSeat().getId()).collect(Collectors.toSet());
+            if (!ids.equals(prices.keySet())) {
+                throw new ValidationAppException("INVALID_INVENTORY", "Provide a price for each seat in the draft");
+            }
+            inventory.forEach(seat -> seat.setPrice(prices.get(seat.getSeat().getId())));
+        }
         return EventResponse.from(event);
     }
 
     @Override
     @Transactional
     public void delete(UserPrincipal principal, UUID id) {
-        Event event = findEvent(id);
+        Event event = lockEvent(id);
         assertOwnerOrAdmin(principal, event);
+        requireDraft(event);
         eventRepository.delete(event);
     }
 
     @Override
     @Transactional
     public EventResponse submit(UserPrincipal principal, UUID id) {
-        Event event = findEvent(id);
+        Event event = lockEvent(id);
         assertOwnerOrAdmin(principal, event);
+        requireDraft(event);
+        var inventory = eventSeatRepository.findByEvent_Id(id);
+        if (!event.getEventDate().isAfter(java.time.LocalDateTime.now()) || inventory.isEmpty()
+                || inventory.stream().anyMatch(seat -> seat.getPrice().signum() <= 0)) {
+            throw new ValidationAppException("INCOMPLETE_EVENT", "Set a future event date and positive prices for all offered seats");
+        }
         event.setStatus(EventStatus.PENDING_APPROVAL);
         return EventResponse.from(event);
     }
@@ -147,8 +170,8 @@ public class EventServiceImpl implements EventService {
 
     @Override
     @Transactional(readOnly = true)
-    public SeatMapResponse seatMap(UUID eventId) {
-        Event event = findEvent(eventId);
+    public SeatMapResponse seatMap(UserPrincipal principal, UUID eventId) {
+        Event event = visibleEvent(principal, eventId);
         var rows = eventSeatRepository.findByEvent_Id(eventId).stream()
                 .sorted(Comparator
                         .comparing((EventSeat eventSeat) -> eventSeat.getSeat().getRowLabel())
@@ -184,6 +207,25 @@ public class EventServiceImpl implements EventService {
     @Transactional(readOnly = true)
     public PageResponse<EventSummaryResponse> myEvents(UserPrincipal principal, Pageable pageable) {
         return PageResponse.from(eventRepository.findByOrganizer_Id(principal.id(), pageable).map(EventSummaryResponse::from));
+    }
+
+    private void requireDraft(Event event) {
+        if (event.getStatus() != EventStatus.DRAFT) {
+            throw new AppException(HttpStatus.CONFLICT, "EVENT_NOT_DRAFT", "Only a draft can be edited or submitted");
+        }
+    }
+
+    private Event lockEvent(UUID id) {
+        return eventRepository.lockById(id).orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+    }
+
+    private Event visibleEvent(UserPrincipal principal, UUID id) {
+        Event event = findEvent(id);
+        if (event.getStatus() == EventStatus.PUBLISHED && Boolean.TRUE.equals(event.getPublicEvent())) return event;
+        if (principal == null || (principal.role() != UserRole.ADMIN && !event.getOrganizer().getId().equals(principal.id()))) {
+            throw new ResourceNotFoundException("Event not found");
+        }
+        return event;
     }
 
     private Event findEvent(UUID id) {

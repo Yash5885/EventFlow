@@ -1,25 +1,18 @@
-import { Building2, QrCode, Rows3 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { listVenues } from '../../api/venues.api';
+import { Workspace } from '../../components/layout/Workspace';
+import { useAuthStore } from '../../store/auth.store';
 
 export function VenueDashboard() {
-  const actions: { to: string; label: string; icon: LucideIcon }[] = [
-    { to: '/venue/create', label: 'Create venue', icon: Building2 },
-    { to: '/venue/demo/seats', label: 'Seat layout', icon: Rows3 },
-    { to: '/venue/scanner', label: 'QR scanner', icon: QrCode }
-  ];
-
-  return (
-    <main className="page-container py-8">
-      <h1 className="text-2xl font-semibold">Venue manager</h1>
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        {actions.map(({ to, label, icon: Icon }) => (
-          <Link key={to} to={to} className="rounded-md border border-border bg-white p-5 shadow-sm hover:shadow-md">
-            <Icon className="h-5 w-5 text-primary" aria-hidden="true" />
-            <span className="mt-4 block font-semibold">{label}</span>
-          </Link>
-        ))}
-      </div>
-    </main>
-  );
+  const managerId = useAuthStore(state => state.user?.id);
+  const venues = useQuery({ queryKey: ['venue-list'], queryFn: () => listVenues({ size: 100 }) });
+  const owned = venues.data?.content.filter(venue => venue.managerId === managerId);
+  return <Workspace role="VENUE_MANAGER" title="Venue operations" description="Manage seat layouts and run event check-in.">
+    <div className="flex flex-wrap gap-4"><Link className="button-dark" to="/venue/create">Create venue</Link><Link className="text-link" to="/venue/scanner">Gate check-in</Link></div>
+    {owned?.length === 0 && <p className="booking-hint">Create a venue to build its seat layout.</p>}
+    <ul className="booking-list mt-5">
+      {owned?.map(venue => <li key={venue.id} className="booking-row"><span><strong>{venue.name}</strong><small>{venue.city}</small></span><Link className="text-link" to={`/venue/${venue.id}/seats`}>Edit seat layout</Link></li>)}
+    </ul>
+  </Workspace>;
 }

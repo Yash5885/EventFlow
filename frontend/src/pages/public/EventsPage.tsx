@@ -1,42 +1,49 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { listEvents } from '../../api/events.api';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { EventCard } from '../../components/events/EventCard';
 import { EventFilters } from '../../components/events/EventFilters';
-import { sampleEvents } from '../../utils/mockData';
 
 export function EventsPage() {
-  const [city, setCity] = useState('');
+  const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['events', city, category],
-    queryFn: () => listEvents({ city: city || undefined, category: category || undefined, size: 24 })
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['events', search.trim(), category],
+    queryFn: () => listEvents({ q: search.trim() || undefined, category: category || undefined, size: 24 })
   });
 
-  const events = useMemo(() => {
-    const source = data?.content.length ? data.content : sampleEvents;
-    return source
-      .filter(event => !city || `${event.city} ${event.title}`.toLowerCase().includes(city.toLowerCase()))
-      .filter(event => !category || event.category === category);
-  }, [category, city, data]);
+  const events = data?.content ?? [];
 
   return (
-    <main>
-      <EventFilters city={city} category={category} onCityChange={setCity} onCategoryChange={setCategory} />
-      <section className="page-container py-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Events</h1>
-          {isLoading && <LoadingSpinner label="Syncing" />}
+    <main className="catalog-page">
+      <header className="catalog-heading">
+        <div className="page-container">
+          <p className="eyebrow">Event discovery</p>
+          <h1>Explore<br />events<span>.</span></h1>
         </div>
-        {isError && <p className="mb-4 text-sm text-amber-700">Showing sample events until the API is available.</p>}
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {events.map(event => (
-            <EventCard key={event.id} event={event} />
-          ))}
+      </header>
+      <section className="page-container catalog-results" aria-label="Event results">
+        <EventFilters search={search} category={category} onSearchChange={setSearch} onCategoryChange={setCategory} />
+        <div className="catalog-status" aria-live="polite">
+          {isLoading ? <LoadingSpinner label="Loading events" /> : !isError && <span>{data?.totalElements ?? 0} {data?.totalElements === 1 ? 'event' : 'events'}</span>}
         </div>
+        {isError ? (
+          <div className="empty-state">
+            <h2>Events couldn’t be loaded.</h2>
+            <button type="button" className="button-dark focus-ring" onClick={() => void refetch()}>Try again</button>
+          </div>
+        ) : events.length > 0 ? (
+          <div className="catalog-grid" key={category}>
+            {events.map(event => <EventCard key={event.id} event={event} />)}
+          </div>
+        ) : !isLoading && (
+          <div className="empty-state">
+            <h2>{search.trim() || category ? 'No events match your search.' : 'No events are listed yet.'}</h2>
+            {(search.trim() || category) && <button type="button" className="button-dark focus-ring" onClick={() => { setSearch(''); setCategory(''); }}>Clear filters</button>}
+          </div>
+        )}
       </section>
     </main>
   );
 }
-

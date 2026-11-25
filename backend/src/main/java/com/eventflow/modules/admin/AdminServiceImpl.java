@@ -69,6 +69,7 @@ public class AdminServiceImpl implements AdminService {
     public EventResponse approveEvent(UUID eventId, String note) {
         Event event = findEvent(eventId);
         event.setStatus(EventStatus.PUBLISHED);
+        event.setPublicEvent(true);
         event.setAdminNote(note);
         return EventResponse.from(event);
     }
@@ -99,8 +100,10 @@ public class AdminServiceImpl implements AdminService {
     }
 
     private Event findEvent(UUID eventId) {
-        return eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+        Event event = eventRepository.lockById(eventId).orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+        if (event.getStatus() != EventStatus.PENDING_APPROVAL) {
+            throw new com.eventflow.common.exception.ValidationAppException("NOT_IN_REVIEW", "Only a submitted event can be reviewed");
+        }
+        return event;
     }
 }
-

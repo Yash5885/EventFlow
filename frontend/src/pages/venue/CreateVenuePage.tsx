@@ -1,25 +1,33 @@
-import { Building2 } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { createVenue } from '../../api/venues.api';
+import { Workspace } from '../../components/layout/Workspace';
+import { getApiErrorMessage } from '../../utils/apiErrors';
 
 export function CreateVenuePage() {
-  return (
-    <main className="page-container py-8">
-      <section className="rounded-md border border-border bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <Building2 className="h-5 w-5 text-primary" aria-hidden="true" />
-          <h1 className="text-2xl font-semibold">Create venue</h1>
-        </div>
-        <form className="mt-6 grid gap-4 md:grid-cols-2">
-          <input className="focus-ring h-11 rounded-sm border border-input px-3" placeholder="Name" />
-          <input className="focus-ring h-11 rounded-sm border border-input px-3" placeholder="City" />
-          <input className="focus-ring h-11 rounded-sm border border-input px-3" placeholder="State" />
-          <input className="focus-ring h-11 rounded-sm border border-input px-3" type="number" placeholder="Capacity" />
-          <textarea className="focus-ring min-h-28 rounded-sm border border-input p-3 md:col-span-2" placeholder="Address" />
-          <button type="button" className="focus-ring rounded-sm bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground md:w-fit">
-            Save venue
-          </button>
-        </form>
-      </section>
-    </main>
-  );
+  const navigate = useNavigate();
+  const cache = useQueryClient();
+  const save = useMutation({ mutationFn: createVenue, onSuccess: venue => {
+    void cache.invalidateQueries({ queryKey: ['venue-list'] });
+    navigate(`/venue/${venue.id}/seats`);
+  } });
+  return <Workspace role="VENUE_MANAGER" title="Create venue">
+    <form className="work-form" onSubmit={event => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      save.mutate({
+        name: String(form.get('name')), address: String(form.get('address')),
+        city: String(form.get('city')), state: String(form.get('state')),
+        totalCapacity: Number(form.get('capacity'))
+      });
+    }}>
+      <label>Name<input name="name" required maxLength={200} /></label>
+      <label>City<input name="city" required maxLength={100} /></label>
+      <label>State<input name="state" required maxLength={100} /></label>
+      <label>Capacity<input name="capacity" type="number" min={1} max={100000} required /></label>
+      <label className="work-wide">Address<textarea name="address" required rows={3} /></label>
+      <button type="submit" className="button-dark" disabled={save.isPending}>Save venue</button>
+    </form>
+    {save.error && <p className="status-note" role="alert">{getApiErrorMessage(save.error, 'Venue could not be saved.')}</p>}
+  </Workspace>;
 }
-

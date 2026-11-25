@@ -17,8 +17,13 @@ public interface TicketService {
 
     PageResponse<TicketResponse> myTickets(UserPrincipal principal, Pageable pageable);
 
-    TicketVerifyResponse verify(String ticketCode);
+    record Attendance(long issued, long checkedIn) { }
 
-    String downloadUrl(UserPrincipal principal, UUID ticketId);
+    List<com.eventflow.modules.event.dto.EventSummaryResponse> gateEvents(UserPrincipal principal);
+
+    Attendance attendance(UserPrincipal principal, UUID eventId);
+
+    TicketVerifyResponse verify(UserPrincipal principal, UUID eventId, String ticketCode);
+
+    byte[] download(UserPrincipal principal, UUID ticketId);
 }
-

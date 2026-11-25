@@ -111,6 +111,10 @@ export interface BookingResponse {
   status: BookingStatus;
   totalAmount: number;
   platformFee: number;
+  eventTitle?: string;
+  venueName?: string;
+  eventDate?: string;
+  amountDue?: number;
   expiresAt: string;
   seats: BookingSeatResponse[];
   createdAt: string;
@@ -121,6 +125,7 @@ export interface LockStatusResponse {
   expiresAt: string;
   remainingSeconds: number;
   isExpired: boolean;
+  canExtend?: boolean;
 }
 
 export interface PaymentInitResponse {
@@ -129,6 +134,7 @@ export interface PaymentInitResponse {
   amount: number;
   currency: string;
   gatewayKey: string;
+  demo: boolean;
 }
 
 export interface TicketResponse {
@@ -139,5 +145,6 @@ export interface TicketResponse {
   qrCodeUrl?: string;
   pdfUrl?: string;
   isUsed: boolean;
+  eventTitle?: string;
+  seatLabel?: string;
 }
-

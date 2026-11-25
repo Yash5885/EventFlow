@@ -1,15 +1,9 @@
-import { BarChart3 } from 'lucide-react';
+import { Workspace } from '../../components/layout/Workspace';
 
 export function EventAnalyticsPage() {
   return (
-    <main className="page-container py-8">
-      <section className="rounded-md border border-border bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <BarChart3 className="h-5 w-5 text-primary" aria-hidden="true" />
-          <h1 className="text-2xl font-semibold">Event analytics</h1>
-        </div>
-      </section>
-    </main>
+    <Workspace role="ORGANIZER" title="Event analytics">
+      <div className="empty-state"><p>Event reporting is unavailable in this view.</p></div>
+    </Workspace>
   );
 }
-

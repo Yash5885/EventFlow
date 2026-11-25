@@ -26,3 +26,12 @@ export async function myBookings() {
   return response.data.data;
 }
 
+
+export async function getBooking(bookingId: string) {
+  const response = await api.get<ApiResponse<BookingResponse>>(`/bookings/${bookingId}`);
+  return response.data.data;
+}
+
+export async function releaseBooking(bookingId: string) {
+  await api.delete(`/bookings/${bookingId}/release`);
+}

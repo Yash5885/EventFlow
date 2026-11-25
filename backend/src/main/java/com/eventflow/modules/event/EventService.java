@@ -15,9 +15,9 @@ import java.util.UUID;
 public interface EventService {
     EventResponse create(UserPrincipal principal, CreateEventRequest request);
 
-    PageResponse<EventSummaryResponse> listPublished(String city, String category, Pageable pageable);
+    PageResponse<EventSummaryResponse> listPublished(String city, String category, String q, Pageable pageable);
 
-    EventDetailResponse detail(UUID id);
+    EventDetailResponse detail(UserPrincipal principal, UUID id);
 
     EventResponse update(UserPrincipal principal, UUID id, UpdateEventRequest request);
 
@@ -27,8 +27,7 @@ public interface EventService {
 
     EventResponse cancel(UserPrincipal principal, UUID id, String reason);
 
-    SeatMapResponse seatMap(UUID eventId);
+    SeatMapResponse seatMap(UserPrincipal principal, UUID eventId);
 
     PageResponse<EventSummaryResponse> myEvents(UserPrincipal principal, Pageable pageable);
 }
-

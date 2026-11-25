@@ -39,3 +39,7 @@ function unwrapApiData<T>(response: ApiResponse<T> | string): T {
 
   return response.data;
 }
+
+export async function getRegistrationOptions() {
+  return (await api.get<ApiResponse<{ staffRoles: boolean }>>('/auth/registration-options')).data.data;
+}

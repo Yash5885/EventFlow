@@ -1,15 +1,15 @@
-import { FilePenLine } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { useParams } from 'react-router-dom';
+import { getEvent, getSeatMap } from '../../api/events.api';
+import { EventEditor } from '../../components/events/EventEditor';
+import { Workspace } from '../../components/layout/Workspace';
 
 export function EditEventPage() {
-  return (
-    <main className="page-container py-8">
-      <section className="rounded-md border border-border bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <FilePenLine className="h-5 w-5 text-primary" aria-hidden="true" />
-          <h1 className="text-2xl font-semibold">Edit event</h1>
-        </div>
-      </section>
-    </main>
-  );
+  const { id = '' } = useParams();
+  const event = useQuery({ queryKey: ['event', id], queryFn: () => getEvent(id) });
+  const map = useQuery({ queryKey: ['seat-map', id], queryFn: () => getSeatMap(id) });
+  return <Workspace role="ORGANIZER" title="Edit event">
+    {event.isError || map.isError ? <p className="status-note" role="alert">This listing could not be opened.</p>
+      : event.data && map.data ? <EventEditor key={id} existing={event.data} inventory={map.data} /> : <p>Loading listing…</p>}
+  </Workspace>;
 }
-

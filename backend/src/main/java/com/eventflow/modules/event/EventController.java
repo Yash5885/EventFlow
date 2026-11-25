@@ -42,14 +42,15 @@ public class EventController {
     public ApiResponse<PageResponse<EventSummaryResponse>> list(
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String category,
+            @RequestParam(required = false) String q,
             Pageable pageable
     ) {
-        return ApiResponse.ok(eventService.listPublished(city, category, pageable));
+        return ApiResponse.ok(eventService.listPublished(city, category, q, pageable));
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<EventDetailResponse> detail(@PathVariable UUID id) {
-        return ApiResponse.ok(eventService.detail(id));
+    public ApiResponse<EventDetailResponse> detail(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
+        return ApiResponse.ok(eventService.detail(principal, id));
     }
 
     @PutMapping("/{id}")
@@ -74,8 +75,8 @@ public class EventController {
     }
 
     @GetMapping("/{id}/seat-map")
-    public ApiResponse<SeatMapResponse> seatMap(@PathVariable UUID id) {
-        return ApiResponse.ok(eventService.seatMap(id));
+    public ApiResponse<SeatMapResponse> seatMap(@AuthenticationPrincipal UserPrincipal principal, @PathVariable UUID id) {
+        return ApiResponse.ok(eventService.seatMap(principal, id));
     }
 
     @GetMapping("/my")
@@ -83,4 +84,3 @@ public class EventController {
         return ApiResponse.ok(eventService.myEvents(principal, pageable));
     }
 }
-

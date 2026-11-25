@@ -25,6 +25,8 @@ import com.eventflow.modules.notification.BookingConfirmedEvent;
 import com.eventflow.modules.notification.KafkaProducerService;
 import com.eventflow.modules.payment.Payment;
 import com.eventflow.modules.payment.PaymentRepository;
+import com.eventflow.modules.payment.RazorpayGateway;
+import com.eventflow.modules.ticket.TicketService;
 import com.eventflow.modules.user.User;
 import com.eventflow.modules.user.UserRepository;
 import com.eventflow.security.UserPrincipal;
@@ -33,17 +35,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
@@ -64,8 +63,10 @@ public class BookingServiceImpl implements BookingService {
     @Value("${app.seat-lock.ttl-minutes}")
     private long lockTtlMinutes;
 
-    @Value("${app.razorpay.key-secret}")
-    private String razorpaySecret;
+    private final RazorpayGateway gateway;
+    private final TicketService ticketService;
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
 
     @Override
     @Transactional
@@ -83,6 +84,7 @@ public class BookingServiceImpl implements BookingService {
         User user = userRepository.findById(principal.id())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
+        UUID lockToken = UUID.randomUUID();
         List<UUID> acquired = new ArrayList<>();
         List<EventSeat> seats = new ArrayList<>();
 
@@ -93,7 +95,7 @@ public class BookingServiceImpl implements BookingService {
                 if (eventSeat.getStatus() != SeatStatus.AVAILABLE) {
                     throw new SeatNotAvailableException("Seat is not available");
                 }
-                if (!seatLockService.acquireLock(event.getId(), eventSeatId, user.getId())) {
+                if (!seatLockService.acquireLock(event.getId(), eventSeatId, lockToken)) {
                     throw new SeatAlreadyLockedException("Seat is already locked by another user");
                 }
                 acquired.add(eventSeatId);
@@ -105,6 +107,7 @@ public class BookingServiceImpl implements BookingService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
             Booking booking = Booking.builder()
                     .user(user)
+                    .lockToken(lockToken)
                     .event(event)
                     .status(BookingStatus.PENDING)
                     .totalAmount(total)
@@ -118,65 +121,101 @@ public class BookingServiceImpl implements BookingService {
                     .build()));
             return BookingResponse.from(bookingRepository.save(booking));
         } catch (RuntimeException exception) {
-            acquired.forEach(eventSeatId -> seatLockService.releaseLock(event.getId(), eventSeatId, user.getId()));
+            acquired.forEach(eventSeatId -> seatLockService.releaseLock(event.getId(), eventSeatId, lockToken));
             throw exception;
         }
     }
 
     @Override
-    @Transactional(isolation = Isolation.SERIALIZABLE)
+    @Transactional
     public BookingResponse confirm(UserPrincipal principal, UUID bookingId, ConfirmBookingRequest request) {
         Booking booking = findBooking(bookingId);
         assertOwnerOrAdmin(principal, booking);
-        if (booking.getStatus() != BookingStatus.PENDING) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Only pending bookings can be confirmed");
-        }
-        if (booking.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new BookingExpiredException("Booking has expired");
-        }
         Payment payment = paymentRepository.findByGatewayOrderId(request.paymentGatewayOrderId())
                 .filter(candidate -> candidate.getBooking().getId().equals(bookingId))
                 .orElseThrow(() -> new ResourceNotFoundException("Payment order not found"));
+        gateway.verifyCheckoutSignature(payment, request.paymentGatewayPaymentId(), request.paymentGatewaySignature());
+        gateway.verifyCaptured(payment, request.paymentGatewayPaymentId());
+        return settleCapture(bookingId, request.paymentGatewayOrderId(), request.paymentGatewayPaymentId());
+    }
 
-        if (!verifyRazorpaySignature(request.paymentGatewayOrderId(), request.paymentGatewayPaymentId(), request.paymentGatewaySignature())) {
-            payment.setStatus(PaymentStatus.FAILED);
-            payment.setFailureReason("Signature verification failed");
-            throw new PaymentVerificationException("Payment signature mismatch");
+    @Override
+    @Transactional
+    public BookingResponse settleCapture(UUID bookingId, String orderId, String paymentId) {
+        Booking booking = bookingRepository.lockById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
+        entityManager.refresh(booking);
+        Payment payment = paymentRepository.findByGatewayOrderId(orderId)
+                .filter(candidate -> candidate.getBooking().getId().equals(bookingId))
+                .orElseThrow(() -> new ResourceNotFoundException("Payment order not found"));
+        entityManager.refresh(payment);
+        if (payment.getStatus() == PaymentStatus.SUCCESS || payment.getStatus() == PaymentStatus.REFUNDED) {
+            if (!paymentId.equals(payment.getGatewayPaymentId())) {
+                throw new PaymentVerificationException("The order already has a different captured payment");
+            }
+            return BookingResponse.from(booking);
         }
 
-        for (BookingItem item : booking.getItems()) {
-            EventSeat lockedSeat = eventSeatRepository.lockById(item.getEventSeat().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Event seat not found"));
-            if (lockedSeat.getStatus() != SeatStatus.AVAILABLE) {
-                throw new SeatNotAvailableException("Seat is no longer available");
-            }
-            if (!seatLockService.isLockedByUser(booking.getEvent().getId(), lockedSeat.getId(), booking.getUser().getId())) {
-                throw new BookingExpiredException("Seat lock has expired");
-            }
-            lockedSeat.setStatus(SeatStatus.BOOKED);
-        }
-
-        booking.setStatus(BookingStatus.CONFIRMED);
-        booking.setBookedAt(LocalDateTime.now());
-        payment.setGatewayPaymentId(request.paymentGatewayPaymentId());
-        payment.setGatewaySignature(request.paymentGatewaySignature());
+        payment.setGatewayPaymentId(paymentId);
         payment.setStatus(PaymentStatus.SUCCESS);
         payment.setPaidAt(LocalDateTime.now());
-        seatLockService.releaseAllLocksForBooking(booking.getId(), booking.getItems().stream().map(item -> item.getEventSeat().getId()).toList(), booking.getEvent().getId());
-        kafkaProducerService.publishBookingConfirmed(toBookingConfirmedEvent(booking));
+        if (booking.getStatus() != BookingStatus.PENDING || !booking.getExpiresAt().isAfter(LocalDateTime.now())
+                || booking.getEvent().getStatus() != EventStatus.PUBLISHED) {
+            return capturedWithoutSeats(booking, payment);
+        }
+
+        List<EventSeat> lockedSeats = new ArrayList<>();
+        for (UUID seatId : booking.getItems().stream().map(item -> item.getEventSeat().getId()).sorted().toList()) {
+            EventSeat seat = eventSeatRepository.lockById(seatId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Event seat not found"));
+            if (seat.getStatus() != SeatStatus.AVAILABLE ||
+                    !seatLockService.isLockedByUser(booking.getEvent().getId(), seatId, booking.activeLockToken())) {
+                return capturedWithoutSeats(booking, payment);
+            }
+            lockedSeats.add(seat);
+        }
+        lockedSeats.forEach(seat -> seat.setStatus(SeatStatus.BOOKED));
+        booking.setStatus(BookingStatus.CONFIRMED);
+        booking.setBookedAt(LocalDateTime.now());
+        var confirmed = toBookingConfirmedEvent(booking);
+        ticketService.generateTicketsForBooking(confirmed);
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    releaseLocks(booking);
+                } finally {
+                    kafkaProducerService.publishBookingConfirmed(confirmed);
+                }
+            }
+        });
         return BookingResponse.from(booking);
+    }
+
+    private BookingResponse capturedWithoutSeats(Booking booking, Payment payment) {
+        payment.setFailureReason("Payment captured after the reservation became unavailable");
+        if (booking.getStatus() == BookingStatus.PENDING) {
+            booking.setStatus(BookingStatus.EXPIRED);
+        }
+        return BookingResponse.from(booking);
+    }
+
+    private void releaseLocks(Booking booking) {
+        seatLockService.releaseAllLocksForBooking(booking.activeLockToken(),
+                booking.getItems().stream().map(item -> item.getEventSeat().getId()).toList(), booking.getEvent().getId());
     }
 
     @Override
     @Transactional
     public void release(UserPrincipal principal, UUID bookingId) {
-        Booking booking = findBooking(bookingId);
+        Booking booking = bookingRepository.lockById(bookingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
         assertOwnerOrAdmin(principal, booking);
         if (booking.getStatus() == BookingStatus.PENDING) {
             booking.setStatus(BookingStatus.CANCELLED);
             booking.setCancelledAt(LocalDateTime.now());
             booking.setCancellationReason("Released by user");
-            seatLockService.releaseAllLocksForBooking(booking.getId(), booking.getItems().stream().map(item -> item.getEventSeat().getId()).toList(), booking.getEvent().getId());
+            if (booking.getLockToken() != null || booking.getExpiresAt().isAfter(LocalDateTime.now())) releaseLocks(booking);
         }
     }
 
@@ -200,25 +239,29 @@ public class BookingServiceImpl implements BookingService {
         Booking booking = findBooking(bookingId);
         assertOwnerOrAdmin(principal, booking);
         long remaining = Math.max(0, Duration.between(LocalDateTime.now(), booking.getExpiresAt()).toSeconds());
-        return new LockStatusResponse(booking.getId(), booking.getExpiresAt(), remaining, remaining == 0);
+        boolean active = booking.getStatus() == BookingStatus.PENDING && booking.getExpiresAt().isAfter(LocalDateTime.now());
+        return new LockStatusResponse(booking.getId(), booking.getExpiresAt(), active ? remaining : 0, !active,
+                active && booking.getLockExtendedAt() == null && !bookingRepository.isWaitlistHold(bookingId));
     }
 
     @Override
     @Transactional
     public LockStatusResponse extendLock(UserPrincipal principal, UUID bookingId) {
-        Booking booking = findBooking(bookingId);
+        Booking booking = bookingRepository.lockById(bookingId).orElseThrow(() -> new ResourceNotFoundException("Booking not found"));
         assertOwnerOrAdmin(principal, booking);
-        if (booking.getStatus() != BookingStatus.PENDING) {
-            throw new AppException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Only pending bookings can be extended");
+        var now = LocalDateTime.now();
+        if (booking.getStatus() != BookingStatus.PENDING || !booking.getExpiresAt().isAfter(now)) {
+            throw new BookingExpiredException("Seat hold has expired");
         }
-        for (BookingItem item : booking.getItems()) {
-            UUID eventSeatId = item.getEventSeat().getId();
-            if (!seatLockService.isLockedByUser(booking.getEvent().getId(), eventSeatId, principal.id())) {
-                throw new BookingExpiredException("Seat lock has expired");
-            }
-            seatLockService.extendLock(booking.getEvent().getId(), eventSeatId, principal.id());
+        if (booking.getLockExtendedAt() != null || bookingRepository.isWaitlistHold(bookingId)) {
+            throw new AppException(HttpStatus.CONFLICT, "HOLD_FIXED", "This hold cannot be extended");
         }
-        booking.setExpiresAt(LocalDateTime.now().plusMinutes(lockTtlMinutes));
+        var seatIds = booking.getItems().stream().map(item -> item.getEventSeat().getId()).toList();
+        if (!seatLockService.extendBookingLocks(booking.getEvent().getId(), seatIds, booking.activeLockToken())) {
+            throw new BookingExpiredException("Seat hold has expired");
+        }
+        booking.setLockExtendedAt(now);
+        booking.setExpiresAt(now.plusMinutes(lockTtlMinutes));
         return lockStatus(principal, bookingId);
     }
 
@@ -232,18 +275,6 @@ public class BookingServiceImpl implements BookingService {
         boolean owner = booking.getUser().getId().equals(principal.id());
         if (!admin && !owner) {
             throw new AppException(HttpStatus.FORBIDDEN, "FORBIDDEN", "You cannot access this booking");
-        }
-    }
-
-    private boolean verifyRazorpaySignature(String orderId, String paymentId, String signature) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(razorpaySecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String payload = orderId + "|" + paymentId;
-            String expected = HexFormat.of().formatHex(mac.doFinal(payload.getBytes(StandardCharsets.UTF_8)));
-            return expected.equals(signature);
-        } catch (Exception exception) {
-            throw new PaymentVerificationException("Unable to verify payment signature");
         }
     }
 

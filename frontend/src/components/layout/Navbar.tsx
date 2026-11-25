@@ -1,90 +1,74 @@
-import { CalendarDays, LayoutDashboard, LogOut, Menu, Search, Ticket, UserRound } from 'lucide-react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { ArrowUpRight, LogOut, Menu, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
 
-const linkClass = ({ isActive }: { isActive: boolean }) =>
-  `inline-flex items-center gap-2 rounded-sm px-2 py-2 text-sm font-medium transition hover:bg-muted ${
-    isActive ? 'text-primary' : 'text-muted-foreground'
-  }`;
+import { useSeatSelectionStore } from '../../store/seat-selection.store';
+
+export function Wordmark() {
+  return <span className="wordmark"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>eventflow<span className="brand-dot">.</span></span>;
+}
 
 export function Navbar() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { pathname } = useLocation();
   const { user, isAuthenticated, clearAuth } = useAuthStore();
+  const [open, setOpen] = useState(false);
+  const dashboardPath = user?.role === 'ADMIN' ? '/admin' : user?.role === 'ORGANIZER' ? '/organizer' : user?.role === 'VENUE_MANAGER' ? '/venue' : '/dashboard';
 
-  const dashboardPath =
-    user?.role === 'ADMIN' ? '/admin' : user?.role === 'ORGANIZER' ? '/organizer' : user?.role === 'VENUE_MANAGER' ? '/venue' : '/dashboard';
+  useEffect(() => setOpen(false), [pathname]);
+
+  const links = (
+    <>
+      <NavLink to="/events">Explore events</NavLink>
+      {isAuthenticated && <NavLink to={dashboardPath}>Dashboard</NavLink>}
+      {isAuthenticated && user?.role === 'CUSTOMER' && <NavLink to="/my-bookings">My bookings</NavLink>}
+    </>
+  );
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-white/95 backdrop-blur">
-      <div className="page-container flex h-16 items-center justify-between gap-4">
-        <Link to="/" className="flex min-w-0 items-center gap-2 font-semibold">
-          <span className="grid h-9 w-9 place-items-center rounded-md bg-primary text-primary-foreground">
-            <Ticket className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <span className="truncate text-lg">EventFlow</span>
-        </Link>
-
-        <nav className="hidden items-center gap-1 md:flex">
-          <NavLink to="/events" className={linkClass}>
-            <Search className="h-4 w-4" aria-hidden="true" />
-            Events
-          </NavLink>
-          {isAuthenticated && (
-            <NavLink to={dashboardPath} className={linkClass}>
-              <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-              Dashboard
-            </NavLink>
-          )}
-          {isAuthenticated && user?.role === 'CUSTOMER' && (
-            <NavLink to="/my-bookings" className={linkClass}>
-              <CalendarDays className="h-4 w-4" aria-hidden="true" />
-              Bookings
-            </NavLink>
-          )}
-        </nav>
-
-        <div className="flex items-center gap-2">
+    <header className="site-header" onKeyDown={event => {
+      if (event.key === 'Escape' && open) {
+        setOpen(false);
+        event.currentTarget.querySelector<HTMLButtonElement>('.nav-toggle')?.focus();
+      }
+    }}>
+      <div className="page-container nav-inner">
+        <Link to="/" className="focus-ring" aria-label="EventFlow home"><Wordmark /></Link>
+        <nav className="site-links" aria-label="Main navigation">{links}</nav>
+        <div className="nav-actions">
           {isAuthenticated ? (
             <>
-              <Link
-                to="/profile"
-                className="focus-ring hidden items-center gap-2 rounded-sm px-2 py-2 text-sm font-medium text-muted-foreground hover:bg-muted sm:inline-flex"
-              >
-                <UserRound className="h-4 w-4" aria-hidden="true" />
-                {user?.name}
-              </Link>
-              <button
-                type="button"
-                title="Log out"
-                onClick={() => {
-                  clearAuth();
-                  navigate('/');
-                }}
-                className="focus-ring grid h-9 w-9 place-items-center rounded-sm border border-border bg-white text-muted-foreground hover:bg-muted"
-              >
-                <LogOut className="h-4 w-4" aria-hidden="true" />
-              </button>
+              <Link to={user?.role === 'CUSTOMER' ? '/profile' : dashboardPath} className="nav-account focus-ring">{user?.name}</Link>
+              <button type="button" aria-label="Log out" title="Log out" className="nav-toggle-button focus-ring" onClick={() => {
+                clearAuth();
+                useSeatSelectionStore.getState().setPreview(null);
+                for (const key of ['booking', 'booking-lock', 'tickets', 'my-bookings', 'my-tickets', 'refund-history', 'refund-queue', 'gate-events', 'gate-attendance', 'organizer-events', 'event-review', 'me']) {
+                  queryClient.removeQueries({ queryKey: [key] });
+                }
+                navigate('/');
+              }}><LogOut size={17} aria-hidden="true" /></button>
             </>
           ) : (
             <>
-              <Link className="focus-ring rounded-sm px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted" to="/login">
-                Login
-              </Link>
-              <Link className="focus-ring rounded-sm bg-primary px-3 py-2 text-sm font-medium text-primary-foreground" to="/register">
-                Register
-              </Link>
+              <Link to="/login" className="nav-account focus-ring">Log in</Link>
+              <Link to="/register" className="nav-join focus-ring">Join EventFlow <ArrowUpRight size={15} aria-hidden="true" /></Link>
             </>
           )}
-          <button
-            type="button"
-            title="Menu"
-            className="focus-ring grid h-9 w-9 place-items-center rounded-sm border border-border bg-white text-muted-foreground md:hidden"
-          >
-            <Menu className="h-4 w-4" aria-hidden="true" />
+          <button type="button" className="nav-toggle nav-toggle-button focus-ring" aria-expanded={open} aria-controls="mobile-navigation" aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen(!open)}>
+            {open ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
           </button>
         </div>
       </div>
+      {open && (
+        <nav id="mobile-navigation" className="page-container mobile-links" aria-label="Mobile navigation">
+          {links}
+          {isAuthenticated && user?.role === 'CUSTOMER' && <NavLink to="/profile">Profile</NavLink>}
+          {!isAuthenticated && <><NavLink to="/login">Log in</NavLink><NavLink to="/register">Join EventFlow</NavLink></>}
+        </nav>
+      )}
     </header>
   );
 }
-

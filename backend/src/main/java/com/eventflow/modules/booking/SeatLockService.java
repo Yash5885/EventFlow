@@ -47,19 +47,20 @@ public class SeatLockService {
         return userId.toString().equals(redisTemplate.opsForValue().get(key(eventId, eventSeatId)));
     }
 
-    public void extendLock(UUID eventId, UUID eventSeatId, UUID userId) {
+    public boolean extendBookingLocks(UUID eventId, List<UUID> eventSeatIds, UUID token) {
         String script = """
-                if redis.call('GET', KEYS[1]) == ARGV[1] then
-                    return redis.call('EXPIRE', KEYS[1], ARGV[2])
+                for _, key in ipairs(KEYS) do
+                    if redis.call('GET', key) ~= ARGV[1] then return 0 end
                 end
-                return 0
+                for _, key in ipairs(KEYS) do
+                    redis.call('EXPIRE', key, ARGV[2])
+                end
+                return 1
                 """;
-        redisTemplate.execute(
-                new DefaultRedisScript<>(script, Long.class),
-                List.of(key(eventId, eventSeatId)),
-                userId.toString(),
-                String.valueOf(TimeUnit.MINUTES.toSeconds(lockTtlMinutes))
-        );
+        var keys = eventSeatIds.stream().map(seat -> key(eventId, seat)).toList();
+        Long result = redisTemplate.execute(new DefaultRedisScript<>(script, Long.class), keys, token.toString(),
+                String.valueOf(TimeUnit.MINUTES.toSeconds(lockTtlMinutes)));
+        return Long.valueOf(1).equals(result);
     }
 
     public long getLockTtl(UUID eventId, UUID eventSeatId) {
@@ -67,12 +68,11 @@ public class SeatLockService {
         return ttl == null ? -2 : ttl;
     }
 
-    public void releaseAllLocksForBooking(UUID bookingId, List<UUID> eventSeatIds, UUID eventId) {
-        eventSeatIds.forEach(eventSeatId -> redisTemplate.delete(key(eventId, eventSeatId)));
+    public void releaseAllLocksForBooking(UUID token, List<UUID> eventSeatIds, UUID eventId) {
+        eventSeatIds.forEach(eventSeatId -> releaseLock(eventId, eventSeatId, token));
     }
 
     private String key(UUID eventId, UUID eventSeatId) {
         return "seat_lock:%s:%s".formatted(eventId, eventSeatId);
     }
 }
-

@@ -12,12 +12,11 @@ import org.springframework.stereotype.Service;
 public class KafkaConsumerService {
 
     private final TicketService ticketService;
-    private final NotificationService notificationService;
+    private final EmailService emailService;
 
-    @KafkaListener(topics = "booking.confirmed", groupId = "eventflow-group")
+    @KafkaListener(topics = "${app.kafka.booking-topic:booking.confirmed}", groupId = "${spring.kafka.consumer.group-id}", autoStartup = "${app.kafka.enabled:true}")
     public void bookingConfirmed(BookingConfirmedEvent event) {
         ticketService.generateTicketsForBooking(event);
-        notificationService.bookingConfirmed(event);
+        emailService.sendTickets(event.bookingId());
     }
 }
-

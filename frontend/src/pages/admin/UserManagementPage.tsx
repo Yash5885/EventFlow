@@ -1,15 +1,9 @@
-import { Users } from 'lucide-react';
+import { Workspace } from '../../components/layout/Workspace';
 
 export function UserManagementPage() {
   return (
-    <main className="page-container py-8">
-      <section className="rounded-md border border-border bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3">
-          <Users className="h-5 w-5 text-primary" aria-hidden="true" />
-          <h1 className="text-2xl font-semibold">User management</h1>
-        </div>
-      </section>
-    </main>
+    <Workspace role="ADMIN" title="User management">
+      <div className="empty-state"><p>Account listing and management controls are unavailable in this view.</p></div>
+    </Workspace>
   );
 }
-

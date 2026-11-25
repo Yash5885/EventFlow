@@ -210,7 +210,7 @@ npm run dev
 
 - Redis-backed distributed seat locking with expiry
 - Ownership-safe Redis lock release/extension via scripts
-- SERIALIZABLE booking-confirmation transactions
+- Idempotent booking confirmation with pessimistic reservation and seat locks
 - JPA pessimistic write locking for seat rows
 - HMAC-SHA256 payment-signature verification
 - Kafka producer-consumer integration for confirmed bookings
@@ -219,14 +219,19 @@ npm run dev
 - Flyway-managed PostgreSQL migrations
 - Dockerized local environment
 
+## Ticketing workflows
+
+- **Payment and delivery.** Set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` for live or Razorpay test-mode payments. Enable automatic capture and configure the HTTPS webhook at `/api/v1/payments/webhook` for `payment.captured` and `refund.processed`. Ticket PDFs are generated and downloaded through the signed-in ticket holder’s account. With `TICKET_MAIL_ENABLED=true`, configure `TICKET_MAIL_FROM` and the `MAIL_*` settings to deliver PDF attachments through SMTP.
+- **Local demo.** The `dev` profile can enable `RAZORPAY_DEMO=true` with the default local key ID. Checkout then labels payments as development transactions and collects no money. Development staff signup requires `APP_AUTH_ALLOW_ROLE_REGISTRATION=true`; use it only on a private local instance.
+- **Publishing and check-in.** Venue managers set up seating sections. Organizers set section prices, preview drafts, and submit them to an administrator. Gate staff select their assigned event and check codes using camera QR scanning, a QR image, or manual code entry.
+- **Waitlist.** When a published event has no available seats, customers can join its queue. Released inventory can become a timed reservation for the next customer. Waitlist offers have a fixed deadline. Standard seat holds can be extended once. The offer appears on the event page and is emailed when SMTP delivery is enabled.
+- **Transfers and refunds.** Unused tickets can be shared through a one-time claim link, which replaces the admission code after the recipient accepts. Customers request refunds from My bookings and administrators review them under Refund requests. For live payments, an approved refund is issued in the Razorpay dashboard and recorded as processed after the verified webhook. The local demo settles approved test refunds without a gateway transaction.
+- **Seat access.** Customers can switch between an interactive map and a list, filter wheelchair spaces, and find adjacent groups within a row.
+
 ## Future Improvements
 
-- Generate actual QR images and PDF tickets
-- Upload generated ticket assets to S3
-- Connect the notification hook to an email provider
-- Add idempotency keys for external payment callbacks
-- Add integration and load tests for concurrent seat booking
-- Introduce observability and metrics for booking/locking flows
+- Add load tests for concurrent seat booking and checkout
+- Introduce observability and metrics for booking and email delivery
 
 ## Disclaimer
 
