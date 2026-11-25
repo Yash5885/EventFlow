@@ -61,8 +61,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/payments/**").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers("/api/v1/tickets/verify", "/api/v1/tickets/gate/**").hasAnyRole("VENUE_MANAGER", "ADMIN")
                         .requestMatchers("/api/v1/tickets/**").hasAnyRole("CUSTOMER", "ADMIN")
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated();
+                })
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
